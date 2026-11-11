@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import sys
+from datetime import datetime, timezone
 
 import pandas as pd
 from confluent_kafka import Consumer
@@ -38,6 +39,9 @@ TRANSACTION_COUNT = Counter(
     'transactions_total',
     'Общее количество обработанных транзакций',
 )
+# Отдельные счётчики позволяют видеть ошибки и долю фрода за выбранное окно.
+PROCESSING_ERRORS = Counter('transaction_processing_errors_total', 'Ошибки обработки транзакций')
+FRAUD_TRANSACTIONS = Counter('fraud_transactions_total', 'Транзакции с флагом фрода')
 FRAUD_SCORE = Histogram(
     'fraud_score',
     'Распределение скоров мошенничества',
@@ -101,26 +105,31 @@ class ProcessingService:
             submission, y_proba, model_version = make_pred(processed_df, "kafka_stream")
 
             score = float(y_proba[0])
-            TRANSACTION_COUNT.inc()
-            FRAUD_SCORE.observe(score)
-            self.total_transactions += 1
-            if score > 0.5:
-                self.fraud_transactions += 1
-            FRAUD_RATIO.set(self.fraud_transactions / self.total_transactions)
-            self._record_model_version(model_version)
-
-            # Добавляем ID и версию модели, которая отскорила запрос
             submission['transaction_id'] = transaction_id
             submission['model_version'] = model_version
 
-            # Отправка результата в топик scoring
+            # Сохраняем срез транзакции: Grafana будет фильтровать результаты в PostgreSQL
+            for column in ('us_state', 'merch', 'cat_id', 'amount'):
+                submission[column] = data['data'].get(column)
+            submission['scored_at'] = datetime.now(timezone.utc).isoformat()
+
             self.producer.produce(
                 SCORING_TOPIC,
                 value=submission.to_json(orient='records'),
             )
             self.producer.flush()
+
+            TRANSACTION_COUNT.inc()
+            FRAUD_SCORE.observe(score)
+            self.total_transactions += 1
+            if score > 0.5:
+                self.fraud_transactions += 1
+                FRAUD_TRANSACTIONS.inc()
+            FRAUD_RATIO.set(self.fraud_transactions / self.total_transactions)
+            self._record_model_version(model_version)
             return True
         except Exception as e:
+            PROCESSING_ERRORS.inc()
             logger.exception(f"Error processing message: {e}")
             return False
 

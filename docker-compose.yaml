@@ -60,7 +60,7 @@ services:
 
   # Сервис для удобного просмотра топиков и настройки kafka
   kafka-ui:
-    image: provectuslabs/kafka-ui:latest
+    image: provectuslabs/kafka-ui:v0.7.2
     depends_on:
       - kafka
     networks:
@@ -119,7 +119,7 @@ services:
       KAFKA_BROKERS: "kafka:9092"
       KAFKA_TOPIC: "transactions"
       TRANSACTIONS_CSV_PATH: /data/train.csv
-      SEND_INTERVAL_SECONDS: "0.1"
+      SEND_INTERVAL_SECONDS: ${SEND_INTERVAL_SECONDS:-0.1}
     volumes:
       - ${TRAIN_DATA_CSV}:/data/train.csv:ro
     depends_on:
@@ -216,39 +216,44 @@ services:
         condition: service_completed_successfully
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.2.1
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
     networks:
       - ml-scorer
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.6.0
     ports:
       - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - GF_PLUGINS_PREINSTALL_DISABLED=true
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_DASHBOARDS_MIN_REFRESH_INTERVAL=1s
     depends_on:
       - prometheus
+      - postgres
     networks:
       - ml-scorer
 
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.9.0
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -257,7 +262,7 @@ services:
       - '--path.procfs=/host/proc'
       - '--path.rootfs=/rootfs'
       - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     expose:
       - 9100
     networks:

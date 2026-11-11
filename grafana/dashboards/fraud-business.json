@@ -1,0 +1,428 @@
+{
+  "uid": "fraud-business",
+  "title": "04 · Бизнес-срезы",
+  "schemaVersion": 40,
+  "version": 1,
+  "tags": [
+    "fraud-monitoring"
+  ],
+  "editable": false,
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "1s",
+      "5s",
+      "10s",
+      "30s",
+      "1m"
+    ]
+  },
+  "panels": [
+    {
+      "title": "Результаты по версиям модели",
+      "type": "table",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 12,
+            "lineWidth": 2,
+            "spanNulls": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Доля фрода"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres"
+          },
+          "rawQuery": true,
+          "rawSql": "SELECT model_version AS \"Версия модели\", COUNT(*) AS \"Скоров\",\n       AVG(fraud_flag)::double precision AS \"Доля фрода\"\nFROM scores WHERE $__timeFilter(scored_at) AND us_state IN (${us_state:sqlstring}) AND merch IN (${merch:sqlstring})\nGROUP BY model_version ORDER BY model_version",
+          "editorMode": "code",
+          "format": "table"
+        }
+      ],
+      "id": 1
+    },
+    {
+      "title": "Доля фрода по версиям",
+      "type": "barchart",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 12,
+            "lineWidth": 2,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "orientation": "vertical",
+        "showValue": "auto",
+        "groupWidth": 0.85,
+        "barWidth": 0.9
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres"
+          },
+          "rawQuery": true,
+          "rawSql": "SELECT model_version AS \"Версия модели\", AVG(fraud_flag)::double precision AS \"Доля фрода\"\nFROM scores WHERE $__timeFilter(scored_at) AND us_state IN (${us_state:sqlstring}) AND merch IN (${merch:sqlstring})\nGROUP BY model_version ORDER BY model_version",
+          "editorMode": "code",
+          "format": "table"
+        }
+      ],
+      "id": 2
+    },
+    {
+      "title": "Плотность распределения скоров",
+      "type": "barchart",
+      "description": "20 интервалов шириной 0.05. Площадь столбцов равна 1. Учитываются время, штат и мерчант.",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 12,
+            "lineWidth": 2,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "orientation": "vertical",
+        "showValue": "auto",
+        "groupWidth": 0.85,
+        "barWidth": 0.9,
+        "xTickLabelRotation": -60
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres"
+          },
+          "rawQuery": true,
+          "rawSql": "WITH filtered AS (\n    SELECT LEAST(FLOOR(score * 20)::int, 19) AS bin\n    FROM scores WHERE $__timeFilter(scored_at) AND us_state IN (${us_state:sqlstring}) AND merch IN (${merch:sqlstring})\n), counts AS (\n    SELECT bin, COUNT(*) AS n FROM filtered GROUP BY bin\n), total AS (\n    SELECT COUNT(*) AS n FROM filtered\n)\nSELECT to_char(b.bin / 20.0, 'FM0.00') || '–' ||\n       to_char((b.bin + 1) / 20.0, 'FM0.00') AS \"Скор\",\n       COALESCE(c.n, 0) * 20.0 / NULLIF(t.n, 0) AS \"Плотность\"\nFROM generate_series(0, 19) AS b(bin)\nLEFT JOIN counts c USING (bin) CROSS JOIN total t\nORDER BY b.bin",
+          "editorMode": "code",
+          "format": "table"
+        }
+      ],
+      "id": 3
+    },
+    {
+      "title": "TPS выбранных транзакций",
+      "type": "timeseries",
+      "description": "Число отскоренных транзакций в десятисекундном интервале, делённое на 10. Учитываются оба фильтра.",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 12,
+            "lineWidth": 2,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres"
+          },
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(scored_at, '10s', 0), COUNT(*) / 10.0 AS \"TPS\"\nFROM scores WHERE $__timeFilter(scored_at) AND us_state IN (${us_state:sqlstring}) AND merch IN (${merch:sqlstring})\nGROUP BY 1 ORDER BY 1",
+          "editorMode": "code",
+          "format": "time_series"
+        }
+      ],
+      "id": 4
+    },
+    {
+      "title": "Доля фрода по категориям: последние 1000",
+      "type": "barchart",
+      "description": "Последние 1000 записей всего потока (или все, если их меньше). Фильтры и период дашборда здесь не применяются.",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 12,
+            "lineWidth": 2,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "groupWidth": 0.85,
+        "barWidth": 0.9
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres"
+          },
+          "rawQuery": true,
+          "rawSql": "WITH latest AS (\n    SELECT cat_id, fraud_flag FROM scores ORDER BY id DESC LIMIT 1000\n)\nSELECT COALESCE(cat_id, 'неизвестно') AS \"Категория\",\n       AVG(fraud_flag)::double precision AS \"Доля фрода\"\nFROM latest GROUP BY cat_id ORDER BY \"Доля фрода\" DESC",
+          "editorMode": "code",
+          "format": "table"
+        }
+      ],
+      "id": 5
+    },
+    {
+      "title": "Сумма операций с флагом фрода",
+      "type": "timeseries",
+      "description": "Показывает денежный объём подозрительных операций за минуту. Это предсказания модели, а не подтверждённые потери.",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 12,
+            "lineWidth": 2,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres"
+          },
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(scored_at, '1m', 0),\n       COALESCE(SUM(amount) FILTER (WHERE fraud_flag = 1), 0)::double precision AS \"Сумма\"\nFROM scores WHERE $__timeFilter(scored_at) AND us_state IN (${us_state:sqlstring}) AND merch IN (${merch:sqlstring})\nGROUP BY 1 ORDER BY 1",
+          "editorMode": "code",
+          "format": "time_series"
+        }
+      ],
+      "id": 6
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "us_state",
+        "label": "Штат",
+        "type": "query",
+        "datasource": {
+          "type": "postgres",
+          "uid": "postgres"
+        },
+        "query": "SELECT DISTINCT us_state FROM scores WHERE $__timeFilter(scored_at) AND us_state IS NOT NULL ORDER BY 1",
+        "definition": "SELECT DISTINCT us_state FROM scores WHERE $__timeFilter(scored_at) AND us_state IS NOT NULL ORDER BY 1",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "options": [],
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "merch",
+        "label": "Мерчант",
+        "type": "query",
+        "datasource": {
+          "type": "postgres",
+          "uid": "postgres"
+        },
+        "query": "SELECT DISTINCT merch FROM scores WHERE $__timeFilter(scored_at) AND us_state IN (${us_state:sqlstring}) AND merch IS NOT NULL ORDER BY 1",
+        "definition": "SELECT DISTINCT merch FROM scores WHERE $__timeFilter(scored_at) AND us_state IN (${us_state:sqlstring}) AND merch IS NOT NULL ORDER BY 1",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "options": [],
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [
+    {
+      "title": "Все дашборды",
+      "type": "dashboards",
+      "tags": [
+        "fraud-monitoring"
+      ],
+      "keepTime": true
+    }
+  ]
+}

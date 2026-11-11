@@ -1,0 +1,336 @@
+{
+  "uid": "fraud-scoring",
+  "title": "01 · Скоринг потока",
+  "schemaVersion": 40,
+  "version": 1,
+  "tags": [
+    "fraud-monitoring"
+  ],
+  "editable": false,
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "1s",
+      "5s",
+      "10s",
+      "30s",
+      "1m"
+    ]
+  },
+  "panels": [
+    {
+      "title": "Обработано, TPS",
+      "type": "timeseries",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 12,
+            "lineWidth": 2,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(transactions_total[30s]))",
+          "legendFormat": "Обработано, TPS",
+          "range": true,
+          "editorMode": "code"
+        }
+      ],
+      "id": 1
+    },
+    {
+      "title": "Среднее время обработки",
+      "type": "timeseries",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 12,
+            "lineWidth": 2,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(transaction_processing_seconds_sum[30s])) / clamp_min(sum(rate(transaction_processing_seconds_count[30s])), 0.001)",
+          "legendFormat": "Среднее время обработки",
+          "range": true,
+          "editorMode": "code"
+        }
+      ],
+      "id": 2
+    },
+    {
+      "title": "Доля фрода за минуту",
+      "type": "timeseries",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 12,
+            "lineWidth": 2,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(fraud_transactions_total[1m])) / clamp_min(sum(rate(transactions_total[1m])), 0.001)",
+          "legendFormat": "Доля фрода за минуту",
+          "range": true,
+          "editorMode": "code"
+        }
+      ],
+      "id": 3
+    },
+    {
+      "title": "Ошибки скоринга за минуту",
+      "type": "timeseries",
+      "description": "Новая метрика: помогает отличить остановку потока от ошибок обработки входных сообщений.",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 12,
+            "lineWidth": 2,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(transaction_processing_errors_total[1m]))",
+          "legendFormat": "Ошибки скоринга за минуту",
+          "range": true,
+          "editorMode": "code"
+        }
+      ],
+      "id": 4
+    },
+    {
+      "title": "Скоры во времени и смена модели",
+      "type": "heatmap",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 12,
+            "lineWidth": 2,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "cellGap": 1,
+        "color": {
+          "mode": "scheme",
+          "scheme": "Oranges",
+          "steps": 64
+        },
+        "yAxis": {
+          "min": 0,
+          "max": 1,
+          "unit": "short"
+        },
+        "tooltip": {
+          "show": true,
+          "yHistogram": true
+        },
+        "legend": {
+          "show": true
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (le) (increase(fraud_score_bucket{le!=\"+Inf\"}[30s]))",
+          "legendFormat": "Скоры во времени и смена модели",
+          "range": true,
+          "editorMode": "code",
+          "format": "heatmap"
+        }
+      ],
+      "id": 5
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Новая модель",
+        "enable": true,
+        "hide": false,
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "iconColor": "#FFB357",
+        "expr": "model_version_updates_total unless model_version_updates_total offset 30s",
+        "step": "1s",
+        "tagKeys": "version",
+        "titleFormat": "Модель {{version}}",
+        "textFormat": "Скоринг подхватил версию {{version}} без перезапуска"
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "Все дашборды",
+      "type": "dashboards",
+      "tags": [
+        "fraud-monitoring"
+      ],
+      "keepTime": true
+    }
+  ]
+}
